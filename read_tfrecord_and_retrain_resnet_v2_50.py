@@ -8,21 +8,21 @@ tfrecord_file = "data_train.tfrecord"
 
 image_pixels = 224
 classes = 2
-epochs = 300
+epochs = 200
 train_size = 7678
 batch_size = 20
 
 def read_and_decode(serialized_example):
-    features = tf.compat.v1.parse_single_example(serialized_example, features={"label":tf.compat.v1.FixedLenFeature([], tf.compat.v1.int64), "image_ir":tf.compat.v1.FixedLenFeature([], tf.compat.v1.string), "image_rd":tf.compat.v1.FixedLenFeature([], tf.compat.v1.string)})
+    features = tf.compat.v1.parse_single_example(serialized_example, features={"label":tf.compat.v1.FixedLenFeature([], tf.compat.v1.int64),
+                                                                               "image_ir":tf.compat.v1.FixedLenFeature([], tf.compat.v1.string),
+                                                                               "image_rd":tf.compat.v1.FixedLenFeature([], tf.compat.v1.string)})
     img_ir = tf.compat.v1.decode_raw(features["image_ir"], tf.compat.v1.uint8)
     img_ir = tf.compat.v1.reshape(img_ir, [image_pixels, image_pixels, 3])
-    img_ir = tf.compat.v1.cast(img_ir, tf.compat.v1.float32)
 
     img_rd = tf.compat.v1.decode_raw(features["image_rd"], tf.compat.v1.uint8)
     img_rd = tf.compat.v1.reshape(img_rd, [image_pixels, image_pixels, 3])
-    img_rd = tf.compat.v1.cast(img_rd, tf.compat.v1.float32)
     
-    label = tf.compat.v1.cast(features["label"], tf.compat.v1.int32)
+    label = tf.compat.v1.cast(features["label"], tf.compat.v1.int64)
     return img_ir, img_rd, label
 
 images_ir = tf.compat.v1.placeholder(tf.compat.v1.float32, [None, image_pixels, image_pixels, 3], name="input/x_input_ir")
@@ -72,5 +72,5 @@ with tf.compat.v1.Session() as sess:
             _, _total_loss, _accuracy = sess.run([train_step, total_loss, accuracy], feed_dict={images_ir:img_train_ir, images_rd:img_train_rd, labels:label_train})
             if step % 10 == 0:
                 print("step:", step / 10, " total_loss:", _total_loss, " accuracy:", _accuracy)
-        tf.compat.v1.train.Saver().save(sess, "ckpt_data/model.ckpt", global_step=epoch)
+        tf.compat.v1.train.Saver().save(sess, "ckpts/model.ckpt", global_step=epoch)
         print("save ckpt:", epoch)

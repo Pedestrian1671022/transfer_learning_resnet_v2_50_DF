@@ -1,4 +1,7 @@
 import os
+import cv2
+import shutil
+import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import slim
 from resnet_utils import resnet_arg_scope
@@ -8,26 +11,24 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 image_pixels = 224
 classes = 2
-test_size = 6371
-batch_size = 5
+test_size = 46773
+# test_size = 6371
+batch_size = 1
 tfrecord_file = "data_test.tfrecord"
 
 
 def read_and_decode(serialized_example):
-    features = tf.compat.v1.parse_single_example(serialized_example, features={
-        "label": tf.compat.v1.FixedLenFeature([], tf.compat.v1.int64),
-        "image_ir": tf.compat.v1.FixedLenFeature([], tf.compat.v1.string),
-        "image_rd": tf.compat.v1.FixedLenFeature([], tf.compat.v1.string),
-        "filename": tf.compat.v1.FixedLenFeature([], tf.compat.v1.string)})
+    features = tf.compat.v1.parse_single_example(serialized_example, features={"label": tf.compat.v1.FixedLenFeature([], tf.compat.v1.int64),
+                                                                               "image_ir": tf.compat.v1.FixedLenFeature([], tf.compat.v1.string),
+                                                                               "image_rd": tf.compat.v1.FixedLenFeature([], tf.compat.v1.string),
+                                                                               "filename": tf.compat.v1.FixedLenFeature([], tf.compat.v1.string)})
     img_ir = tf.compat.v1.decode_raw(features["image_ir"], tf.compat.v1.uint8)
     img_ir = tf.compat.v1.reshape(img_ir, [image_pixels, image_pixels, 3])
-    img_ir = tf.compat.v1.cast(img_ir, tf.compat.v1.float32)
 
     img_rd = tf.compat.v1.decode_raw(features["image_rd"], tf.compat.v1.uint8)
     img_rd = tf.compat.v1.reshape(img_rd, [image_pixels, image_pixels, 3])
-    img_rd = tf.compat.v1.cast(img_rd, tf.compat.v1.float32)
 
-    label = tf.compat.v1.cast(features["label"], tf.compat.v1.int32)
+    label = tf.compat.v1.cast(features["label"], tf.compat.v1.int64)
 
     filename = tf.compat.v1.cast(features["filename"], tf.compat.v1.string)
     return img_ir, img_rd, label, filename
@@ -43,7 +44,7 @@ correct_prediction = tf.compat.v1.equal(labels, tf.compat.v1.argmax(end_points['
 accuracy = tf.compat.v1.reduce_mean(tf.compat.v1.cast(correct_prediction, tf.compat.v1.float32), name="accuracy")
 
 with tf.compat.v1.Session() as sess:
-    ckpt = tf.compat.v1.train.get_checkpoint_state("ckpt_data")
+    ckpt = tf.compat.v1.train.get_checkpoint_state("ckpts")
     if ckpt:
         print(ckpt.model_checkpoint_path)
         tf.compat.v1.train.Saver().restore(sess, ckpt.model_checkpoint_path)
@@ -56,8 +57,23 @@ with tf.compat.v1.Session() as sess:
     next_element_test = iterator_test.get_next()
     sess.run(iterator_test.initializer)
     acc_sum = 0
+    # cv2.namedWindow("image", cv2.WINDOW_AUTOSIZE)
     for _ in range(int(test_size/batch_size)):
-        img_test_ir, img_test_rd, label_test, filename = sess.run(next_element_test)
-        acc = sess.run(accuracy, feed_dict={images_ir: img_test_ir, images_rd: img_test_rd, labels: label_test})
-        acc_sum += acc
-    print("acc:", acc_sum/(int(test_size/batch_size)))
+        try:
+            img_test_ir, img_test_rd, label_test, filename = sess.run(next_element_test)
+            # cv2.imshow("image", np.squeeze(img_test_ir))
+            # cv2.waitKey(0)
+            # cv2.imshow("image", np.squeeze(img_test_rd))
+            # cv2.waitKey(0)
+            acc = sess.run(accuracy, feed_dict={images_ir: img_test_ir, images_rd: img_test_rd, labels: label_test})
+            if acc != 1:
+                filename = filename[0].decode()
+                _filename = filename.split("/")
+                if _filename[2] == "true":
+                    shutil.copy(filename, os.path.join("true2false", _filename[-1]))
+                else:
+                    shutil.copy(filename, os.path.join("false2true", _filename[-1]))
+            acc_sum += acc
+        except tf.errors.OutOfRangeError:
+            print(_)
+            print("acc:", acc_sum/_)
